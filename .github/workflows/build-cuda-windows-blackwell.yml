@@ -1,0 +1,40 @@
+name: Build Windows CUDA (all FA quants)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows-cuda:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.24
+        with:
+          cuda: '12.8.1'
+          method: 'local'
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DGGML_CUDA=ON
+          -DGGML_CUDA_FA_ALL_QUANTS=ON
+          -DCMAKE_CUDA_ARCHITECTURES=120
+          -DLLAMA_CURL=OFF
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Copy CUDA runtime DLLs
+        shell: pwsh
+        run: |
+          Copy-Item "$env:CUDA_PATH\bin\cudart64_12.dll" build\bin\Release\
+          Copy-Item "$env:CUDA_PATH\bin\cublas64_12.dll" build\bin\Release\
+          Copy-Item "$env:CUDA_PATH\bin\cublasLt64_12.dll" build\bin\Release\
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: llama-win-cuda12.8-sm120-fa-all-quants
+          path: build/bin/Release/
