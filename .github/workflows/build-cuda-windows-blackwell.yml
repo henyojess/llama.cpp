@@ -34,6 +34,19 @@ jobs:
           Copy-Item "$env:CUDA_PATH\bin\cublas64_12.dll" build\bin\Release\
           Copy-Item "$env:CUDA_PATH\bin\cublasLt64_12.dll" build\bin\Release\
 
+      - name: Copy OpenSSL DLLs
+        shell: pwsh
+        run: |
+          $inc = (Select-String build\CMakeCache.txt -Pattern '^OPENSSL_INCLUDE_DIR:PATH=(.*)$').Matches[0].Groups[1].Value
+          if (-not $inc) { throw "OpenSSL not recorded in CMakeCache.txt" }
+          $root = Split-Path $inc
+          Write-Host "OpenSSL root: $root"
+          $dlls = Get-ChildItem $root -Recurse -Include libssl-3-x64.dll, libcrypto-3-x64.dll |
+            Sort-Object Name -Unique
+          if ($dlls.Count -ne 2) { throw "Expected 2 OpenSSL DLLs, found $($dlls.Count)" }
+          $dlls | ForEach-Object { Write-Host "Copying $($_.FullName)" }
+          $dlls | Copy-Item -Destination build\bin\Release\
+
       - uses: actions/upload-artifact@v4
         with:
           name: llama-win-cuda12.8-sm120-fa-all-quants
