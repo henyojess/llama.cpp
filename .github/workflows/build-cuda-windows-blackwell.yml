@@ -10,6 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set artifact name
+        shell: pwsh
+        run: |
+          $date = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmm')
+          $sha  = $env:GITHUB_SHA.Substring(0, 7)
+          "ARTIFACT_NAME=llama-win-cuda12.8-sm120-fa-all-quants-$date-$sha" |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.24
         with:
@@ -23,9 +31,13 @@ jobs:
           -DGGML_CUDA_FA_ALL_QUANTS=ON
           -DCMAKE_CUDA_ARCHITECTURES=120
           -DLLAMA_CURL=OFF
+          -DLLAMA_BUILD_TESTS=OFF
+          -DLLAMA_BUILD_EXAMPLES=OFF
 
       - name: Build
-        run: cmake --build build --config Release -j 4
+        run: >
+          cmake --build build --config Release -j 4
+          --target llama-server llama-cli llama-bench llama-quantize
 
       - name: Copy CUDA runtime DLLs
         shell: pwsh
@@ -47,7 +59,11 @@ jobs:
           $dlls | ForEach-Object { Write-Host "Copying $($_.FullName)" }
           $dlls | Copy-Item -Destination build\bin\Release\
 
+      - name: List output
+        shell: pwsh
+        run: Get-ChildItem build\bin\Release | Format-Table Name, Length
+
       - uses: actions/upload-artifact@v4
         with:
-          name: llama-win-cuda12.8-sm120-fa-all-quants
+          name: ${{ env.ARTIFACT_NAME }}
           path: build/bin/Release/
